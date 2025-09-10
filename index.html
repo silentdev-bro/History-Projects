@@ -439,34 +439,35 @@
             window.location.hash = e.target.value;
         });
 
-        const apiKey = ""; 
-        const model = "gemini-2.5-flash-preview-05-20";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-        async function callGeminiAPI(payload, retries = 3, delay = 1000) {
+        // *** UPDATED API CALL FUNCTION ***
+        async function callGeminiAPI(payload) {
             try {
-                const response = await fetch(apiUrl, {
+                // We now call our OWN server endpoint, not Google's.
+                const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload) // Pass the original payload
                 });
 
                 if (!response.ok) {
-                    if (response.status === 429 && retries > 0) {
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        return callGeminiAPI(payload, retries - 1, delay * 2);
-                    }
                     throw new Error(`API request failed with status ${response.status}`);
                 }
+
                 const result = await response.json();
                 const candidate = result.candidates?.[0];
+
                 if (candidate && candidate.content?.parts?.[0]?.text) {
                     return candidate.content.parts[0].text;
-                } else {
-                    throw new Error("Invalid response structure from API.");
+                } else if (result.error) {
+                    console.error("API Error:", result.error.message);
+                    return `I'm sorry, an error occurred: ${result.error.message}`;
+                } 
+                else {
+                    // This handles cases where Gemini blocks a response due to safety settings
+                    return "I am unable to provide a response to that query at this time. Please try a different question.";
                 }
             } catch (error) {
-                console.error("Error calling Gemini API:", error);
+                console.error("Error calling backend API:", error);
                 return "I'm sorry, I seem to be having trouble connecting with the digital ether. Please try again shortly.";
             }
         }
